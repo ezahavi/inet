@@ -91,6 +91,7 @@ void EtherMACFullDuplex::handleSelfMessage(cMessage *msg)
 
 void EtherMACFullDuplex::startFrameTransmission()
 {
+    ASSERT(curTxFrame);
     EV << "Transmitting a copy of frame " << curTxFrame << endl;
 
     EtherFrame *frame = curTxFrame->dup();  // note: we need to duplicate the frame because we emit a signal with it in endTxPeriod()
@@ -179,7 +180,7 @@ void EtherMACFullDuplex::processFrameFromUpperLayer(EtherFrame *frame)
     }
 
     if (transmitState == TX_IDLE_STATE)
-        scheduleEndIFGPeriod();
+        startFrameTransmission();
 }
 
 void EtherMACFullDuplex::processMsgFromNetwork(EtherTraffic *msg)
@@ -240,13 +241,11 @@ void EtherMACFullDuplex::handleEndIFGPeriod()
     if (transmitState != WAIT_IFG_STATE)
         error("Not in WAIT_IFG_STATE at the end of IFG period");
 
-    if (NULL == curTxFrame)
-        error("End of IFG and no frame to transmit");
-
     // End of IFG period, okay to transmit
-    EV << "IFG elapsed, now begin transmission of frame " << curTxFrame << endl;
+    EV << "IFG elapsed" << endl;
 
-    startFrameTransmission();
+    getNextFrameFromQueue();
+    beginSendFrames();
 }
 
 void EtherMACFullDuplex::handleEndTxPeriod()
@@ -288,8 +287,8 @@ void EtherMACFullDuplex::handleEndTxPeriod()
     }
     else
     {
-        getNextFrameFromQueue();
-        beginSendFrames();
+        EV << "Start IFG period\n";
+        scheduleEndIFGPeriod();
     }
 }
 
@@ -309,6 +308,7 @@ void EtherMACFullDuplex::handleEndPausePeriod()
         error("End of PAUSE event occurred when not in PAUSE_STATE!");
 
     EV << "Pause finished, resuming transmissions\n";
+    getNextFrameFromQueue();
     beginSendFrames();
 }
 
@@ -359,8 +359,6 @@ void EtherMACFullDuplex::processPauseCommand(int pauseUnits)
 
 void EtherMACFullDuplex::scheduleEndIFGPeriod()
 {
-    ASSERT(curTxFrame);
-
     EtherIFG gap;
     transmitState = WAIT_IFG_STATE;
     scheduleAt(simTime() + transmissionChannel->calculateDuration(&gap), endIFGMsg);
@@ -380,15 +378,19 @@ void EtherMACFullDuplex::beginSendFrames()
 {
     if (curTxFrame)
     {
-        // Other frames are queued, therefore wait IFG period and transmit next frame
-        EV << "Transmit next frame in output queue, after IFG period\n";
-        scheduleEndIFGPeriod();
+        // Other frames are queued, transmit next frame
+        EV << "Transmit next frame in output queue\n";
+        startFrameTransmission();
     }
     else
     {
-        transmitState = TX_IDLE_STATE;
         // No more frames set transmitter to idle
-        EV << "No more frames to send, transmitter set to idle\n";
+        transmitState = TX_IDLE_STATE;
+        if (!txQueue.extQueue){
+            // Output only for internal queue (we cannot be shure that there
+            //are no other frames in external queue)
+            EV << "No more frames to send, transmitter set to idle\n";
+        }
     }
 }
 
