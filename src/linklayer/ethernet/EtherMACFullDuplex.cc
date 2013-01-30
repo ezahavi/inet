@@ -244,7 +244,6 @@ void EtherMACFullDuplex::handleEndIFGPeriod()
     // End of IFG period, okay to transmit
     EV << "IFG elapsed" << endl;
 
-    getNextFrameFromQueue();
     beginSendFrames();
 }
 
@@ -276,6 +275,7 @@ void EtherMACFullDuplex::handleEndTxPeriod()
     delete curTxFrame;
     curTxFrame = NULL;
     lastTxFinishTime = simTime();
+    getNextFrameFromQueue();
 
     if (pauseUnitsRequested > 0)
     {
@@ -308,7 +308,6 @@ void EtherMACFullDuplex::handleEndPausePeriod()
         error("End of PAUSE event occurred when not in PAUSE_STATE!");
 
     EV << "Pause finished, resuming transmissions\n";
-    getNextFrameFromQueue();
     beginSendFrames();
 }
 
