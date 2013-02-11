@@ -90,8 +90,11 @@ void PingTestApp::initialize(int stage)
     {
         srcAddr = IPvXAddressResolver().resolve(par("srcAddr"));
         // schedule first ping (use empty destAddr to disable)
+        EV << getFullPath() << " scheduling first ping." << endl;
         cMessage *msg = new cMessage("sendPing");
         scheduleAt(startTime, msg);
+    } else {
+        EV << getFullPath() << " no destAddresses  - no active pings from " << endl;
     }
 }
 
@@ -117,21 +120,27 @@ void PingTestApp::handleMessage(cMessage *msg)
                     destAddresses.push_back(addr);
                 }
             }
+
+            if (destAddresses.size() == 0) {
+                EV << getFullPath() << " No destinations found. No pings!" << endl;
+            } else {
+                startDestIdx = intuniform(0, destAddresses.size()-1);
+            }
         }
 
         if (sendSeqNo % count == 0)
         {
             // choose next dest address
             unsigned long i = sendSeqNo / count;
-            if (i >= destAddresses.size() && !continuous)
+            if (!continuous && (i >= destAddresses.size()))
             {
                 delete msg;
                 return;
             }
 
-            i = i % destAddresses.size();
-            destAddr = destAddresses[i];
-            EV << "Starting up: dest=" << destAddr << "  src=" << srcAddr << "seqNo=" << sendSeqNo << endl;
+            destAddr = destAddresses[(i + startDestIdx) % destAddresses.size()];
+            i++;
+            EV << "Starting up: dest=" << destAddr << " src=" << srcAddr << " seqNo=" << sendSeqNo << endl;
             ASSERT(!destAddr.isUnspecified());
         }
 

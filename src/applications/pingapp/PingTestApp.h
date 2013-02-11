@@ -61,6 +61,7 @@ class INET_API PingTestApp : public cSimpleModule
     bool continuous;
 
     // state
+    long startDestIdx;
     long sendSeqNo;
     long expectedReplySeqNo;
     simtime_t sendTimeHistory[PINGTEST_HISTORY_SIZE];
